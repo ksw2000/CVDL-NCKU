@@ -5,12 +5,23 @@ import sys
 import cv2
 import numpy as np
 
+CV2PreviewSize = 750
+
+def resize(img):
+    height, width = img.shape[0], img.shape[1]
+    # width : height = 750 : newHeight
+    height = int(height * CV2PreviewSize / width)
+    width = CV2PreviewSize
+    return cv2.resize(img, (width, height))
+
 
 class Global:
     fileList = []
     fileListMapping = {}
     extrinsicAttentionImageIndex = 0
     projectWordInput = 'CAMERA'
+    imageR = None
+    imageL = None
 
     def extrinsicAttentionImage(self, i):
         self.extrinsicAttentionImageIndex = i
@@ -20,6 +31,7 @@ class Global:
 
 
 g = Global()
+
 
 class Calibration:
     def __init__(self):
@@ -41,12 +53,7 @@ class Calibration:
                     gray, corners, (11, 11), (-1, -1), criteria)
                 cv2.drawChessboardCorners(
                     img, (self.boardW, self.boardH), corners, retval)
-            # width : height = 100 : newHeight
-            height = int(height * 1000 / width)
-            width = 1000
-            img = cv2.resize(img, (width, height),
-                             interpolation=cv2.INTER_NEAREST)
-            cv2.imshow('preview', img)
+            cv2.imshow('preview', resize(img))
             cv2.waitKey(500)
 
     def calibrateCamera(self):
@@ -115,17 +122,10 @@ class Calibration:
         for file in g.fileList:
             img = cv2.imdecode(np.fromfile(file, dtype=np.uint8), 1)
             dest = cv2.undistort(img, cameraMatrix, distCoeffs)
-            width, height = img.shape[0], img.shape[1]
-            # width : height = 100 : newHeight
-            height = int(height * 750 / width)
-            width = 750
-            img = cv2.resize(img, (width, height),
-                             interpolation=cv2.INTER_NEAREST)
-            dest = cv2.resize(dest, (width, height),
-                              interpolation=cv2.INTER_NEAREST)
-            cv2.imshow("Distorted image", img)
-            cv2.imshow("Undistored image", dest)
+            cv2.imshow("Distorted image", resize(img))
+            cv2.imshow("Undistored image", resize(dest))
             cv2.waitKey(500)
+
 
 class Projector:
     def __init__(self):
@@ -176,15 +176,7 @@ class Projector:
                          (0, 0, 255), 10)
                 i += 2
 
-            # resize
-            width, height = img.shape[0], img.shape[1]
-            # width : height = 100 : newHeight
-            height = int(height * 750 / width)
-            width = 750
-            img = cv2.resize(img, (width, height),
-                             interpolation=cv2.INTER_NEAREST)
-
-            cv2.imshow("projection", img)
+            cv2.imshow("AR", resize(img))
             cv2.waitKey(1000)
 
     def projectWords2D(self):
@@ -195,6 +187,46 @@ class Projector:
         self.projectWords(
             "./alphabet_lib_vertical.txt")
 
+    def stereoDisparityMap(self):
+        # reference:
+        # https://github.com/princeton-computational-imaging/SeeingThroughFog/blob/09d3c71be4834b4ad59bb0616dd49f0fa439b950/tools/ProjectionTools/Gated2RGB/lib/image_transformer.py#L137#L137
+        # https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#stereobm-operator
+
+        stereo = cv2.StereoBM_create(numDisparities=256, blockSize=25)
+        if g.imageL == None or g.imageR == None:
+            print("either imageL or imageR is empty")
+
+        self.imgL = cv2.imdecode(np.fromfile(g.imageL, dtype=np.uint8), 1)
+        self.imgR = cv2.imdecode(np.fromfile(g.imageR, dtype=np.uint8), 1)
+        self.disparity = stereo.compute(
+            cv2.cvtColor(self.imgL, cv2.COLOR_BGR2GRAY), 
+            cv2.cvtColor(self.imgR, cv2.COLOR_BGR2GRAY))
+        
+        self.scaleFactor = self.imgL.shape[1] / CV2PreviewSize
+        print(self.imgL.shape[1], self.scaleFactor)
+
+        self.imgL = resize(self.imgL)
+        self.imgR = resize(self.imgR)
+        self.disparity = resize(self.disparity)
+
+        # normalize
+        disparityGray = cv2.normalize(
+            self.disparity, None, alpha=0, beta=256, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8UC1)
+        
+        cv2.imshow("imgL", self.imgL)
+        cv2.namedWindow("imgL")
+        cv2.setMouseCallback('imgL', self.clickOnCVCanvas)
+        cv2.imshow("imgR", self.imgR)
+        cv2.imshow("disparity", disparityGray)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    def clickOnCVCanvas(self, event, x, y, flags, param):
+        if event == cv2.EVENT_LBUTTONDOWN:
+            x2 = int(x - self.disparity[y][x] / 16 / self.scaleFactor)
+            imgTmp = np.copy(self.imgR)
+            cv2.circle(imgTmp, (x2, y), 3, (0, 255, 0), -1)
+            cv2.imshow("imgR", imgTmp)
 
 class Window:
     # Reference:
@@ -226,6 +258,18 @@ class Window:
         self.calibration.result = ()
         return files
 
+    def openImageL(self):
+        # https://shengyu7697.github.io/python-pyqt-qfiledialog/
+        filename, filetype = QtWidgets.QFileDialog.getOpenFileName()
+        if filename:
+            g.imageL = filename
+
+    def openImageR(self):
+        # https://shengyu7697.github.io/python-pyqt-qfiledialog/
+        filename, filetype = QtWidgets.QFileDialog.getOpenFileName()
+        if filename:
+            g.imageR = filename
+
     def boxA(self):
         btn1 = QtWidgets.QPushButton(self.window)
         btn1.setText('Load Folder')
@@ -233,9 +277,11 @@ class Window:
 
         btn2 = QtWidgets.QPushButton(self.window)
         btn2.setText('Load Image_L')
+        btn2.clicked.connect(self.openImageL)
 
         btn3 = QtWidgets.QPushButton(self.window)
         btn3.setText('Load Image_R')
+        btn3.clicked.connect(self.openImageR)
 
         box = QtWidgets.QGroupBox(title="Load Image", parent=self.window)
         box.setGeometry(0, 0, self.UnitWIDTH, self.windowHeight)
@@ -311,6 +357,7 @@ class Window:
     def boxD(self):
         btn11 = QtWidgets.QPushButton(self.window)
         btn11.setText('3.1 Stereo Disparity Map')
+        btn11.clicked.connect(self.projector.stereoDisparityMap)
 
         box = QtWidgets.QGroupBox(
             title="3. Stereo Disparity Map", parent=self.window)
@@ -323,7 +370,5 @@ class Window:
         self.window.show()
         sys.exit(self.app.exec())
 
-
-# const
 window = Window()
 window.render()
