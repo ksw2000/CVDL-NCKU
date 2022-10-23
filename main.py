@@ -5,7 +5,7 @@ import sys
 import cv2
 import numpy as np
 
-CV2PreviewSize = 750
+CV2PreviewSize = 950
 
 def resize(img):
     height, width = img.shape[0], img.shape[1]
