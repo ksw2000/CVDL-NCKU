@@ -36,15 +36,23 @@ class SIFT:
         sift = cv2.SIFT_create()
         key1, des1 = sift.detectAndCompute(img1, None)
         key2, des2 = sift.detectAndCompute(img2, None)
+
         # reference
         # https://www.programcreek.com/python/example/110686/cv2.DescriptorMatcher_create
         # https://docs.opencv.org/3.4/d5/d6f/tutorial_feature_flann_matcher.html
-        matcher = cv2.DescriptorMatcher_create("FlannBased")
+        # https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html
+        
+        # FLANN parameters
+        FLANN_INDEX_KDTREE = 1
+        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+        search_params = dict(checks=50)
+
+        matcher = cv2.FlannBasedMatcher(index_params,search_params)
         rowMatched = matcher.knnMatch(des1, des2, k = 2)
         matchedOneToTwo = []
-        for m in rowMatched:
-            if len(m) == 2 and m[0].distance < m[1].distance * 0.65:
-                matchedOneToTwo.append(m)
+        for (m, n) in rowMatched:
+            if m.distance < n.distance * 0.7:
+                matchedOneToTwo.append((m, n))
         img3 = cv2.drawMatchesKnn(
             img1, key1, img2, key2, matchedOneToTwo, None, (0, 255, 255), (0, 255, 0), None) 
         cv2.namedWindow("4-2 matched keypoints", cv2.WINDOW_AUTOSIZE)
