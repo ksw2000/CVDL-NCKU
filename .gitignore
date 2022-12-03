@@ -160,3 +160,4 @@ resnet50-BinaryCrossEntrop
 ResNet/inference_dataset/*
 ResNet/training_dataset/*
 ResNet/validation_dataset/*
+Background Subtraction/Dataset_CvDl_Hw2/*
