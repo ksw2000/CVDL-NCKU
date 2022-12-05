@@ -106,6 +106,8 @@ class Util:
         return detector.detect(gray)
 
     def detectBlueCircle():
+        if g.videoPath == '':
+            print("please choose video")
         cap = cv2.VideoCapture(g.videoPath)
 
         ret, frame = cap.read()
@@ -321,11 +323,15 @@ class Util:
 
         # convert bgr to gray
         imagesGray = np.array([np.reshape(cv2.cvtColor(
-            img, cv2.COLOR_BGR2GRAY), (-1)) for img in images], dtype=np.float32)
+            img, cv2.COLOR_BGR2GRAY), (-1)) for img in images])
         resultGray = np.array([np.reshape(cv2.cvtColor(
-            res, cv2.COLOR_BGR2GRAY), (-1)) for res in result], dtype=np.float32)
+            res, cv2.COLOR_BGR2GRAY), (-1)) for res in result])
 
         # computing reconstruction error (RE)
+        print(np.reshape(imagesGray[0], (350, 350)))
+        print(np.reshape(resultGray[0], (350, 350)))
+        cv2.imshow("imggray", np.reshape(imagesGray[0], (350, 350)))
+        cv2.imshow("resultGray", np.reshape(resultGray[0], (350, 350)))
         error = np.sqrt(np.sum((imagesGray - resultGray) ** 2, axis=1))
         print("reconstruction error:")
         print(error)
