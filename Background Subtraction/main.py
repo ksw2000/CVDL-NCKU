@@ -330,8 +330,6 @@ class Util:
         # computing reconstruction error (RE)
         print(np.reshape(imagesGray[0], (350, 350)))
         print(np.reshape(resultGray[0], (350, 350)))
-        cv2.imshow("imggray", np.reshape(imagesGray[0], (350, 350)))
-        cv2.imshow("resultGray", np.reshape(resultGray[0], (350, 350)))
         error = np.sqrt(np.sum((imagesGray - resultGray) ** 2, axis=1))
         print("reconstruction error:")
         print(error)
